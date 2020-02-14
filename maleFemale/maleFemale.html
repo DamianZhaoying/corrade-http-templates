@@ -1,0 +1,90 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>Measuring Male-To-Female Ratio on a Simulator</title>
+
+		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+		<style type="text/css">
+${demo.css}
+		</style>
+		<script type="text/javascript">
+        $(function () {
+            Highcharts.setOptions({
+                global: {
+                    useUTC: true
+                },
+                colors: ['#69b4ff', '#FF69B4']
+            });
+            $('#container').highcharts({
+                chart: {
+                    type: 'pie',
+                    options3d: {
+                        enabled: true,
+                        alpha: 45,
+                        beta: 0
+                    },
+                    events: {
+                        load: function () {
+                            // set up the updating of the chart
+                            var series = this.series;
+                            setInterval(function () {
+                                $.ajax({
+                                        type: 'get',
+                                        url: "getMaleFemale.php",
+                                        data: "t=" + Math.random()
+                                }).done(function(response) {
+                                    var a = $.map(response, function(e) { return e; });
+                                    series[0].setData(a);
+                                });
+                            }, 5000);
+                        }
+                    }
+                },
+                title: {
+                    text: '',
+                    useHTML: false
+                },
+                //title: {
+                //    text: '<a href="secondlife://Puguet%20Sound/128/128/10">Puguet Sound</a> Male-to-Female Ratio',
+                //    useHTML: true
+                //},
+                credits: {
+                    enabled: false
+                },
+                tooltip: {
+                    pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
+                },
+                plotOptions: {
+                    pie: {
+                        allowPointSelect: true,
+                        cursor: 'pointer',
+                        depth: 35,
+                        dataLabels: {
+                            enabled: true,
+                            format: '{point.name}'
+                        },
+                        showInLegend: true
+                    }
+                },
+                series: [{
+                    type: 'pie',
+                    name: 'Gender Ratio',
+                    data: [
+                        ["Male", 1],
+                        ["Female", 1]
+                    ]
+                }]
+            });
+        })
+		</script>
+	</head>
+	<body>
+<script src="js/highcharts.js"></script>
+<script src="js/exporting.js"></script>
+
+<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+
+	</body>
+</html>
+

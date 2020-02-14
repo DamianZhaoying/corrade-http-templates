@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <title>Corrade Group Chat Template</title>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Group Chat Relay using Corrade">
+    <meta name="author" content="Wizardry and Steamworks">
+    <link rel="icon" href="favicon.ico">
+
+    <!-- Bootstrap core CSS -->
+    <link href="node_modules/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css?v=1.3">
+</head>
+
+<body>
+    <!-- Group chat container. -->
+	<div class="container">
+		<form role="form" data-toggle="validator">
+			<div class="form-group">
+				<textarea class="form-control" id="chat" readonly="readonly" rows="12"></textarea>
+			</div>
+			<div class="form-group row">
+                <!-- Controls -->
+				<div id="controls">
+                    <div class="col-xs-3">
+                        <div class="input-group">
+                            <span class="input-group-addon">
+                                <label for="name">Name</label>
+                            </span>
+					        <input class="form-control" id="name" maxlength="8" type="text" value="Someone" required>
+                        </div>
+                    </div>
+                    <div class="col-lg-1">
+                        <div class="input-group">
+                            <span class="input-group-addon">
+                                <label for="message">Message</label>
+                            </span>
+                            <div class="input-group col-xs-12">
+                                <input class="form-control" id="message" type="text" required>
+                                <span class="input-group-btn">
+                                    <button class="btn btn-default" id="send" type="submit">Send</button>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+				</div>
+			</div>
+		</form>
+	</div>
+    
+    <!-- Include jQuery -->
+    <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <!-- Include Bootstrap and Validator -->
+    <script src="node_modules/bootstrap/dist/js/bootstrap.min.js"></script>
+    <script src="node_modules/bootstrap-validator/js/validator.js"></script>
+    <!-- Include Velocity -->
+    <script src="node_modules/velocity-animate/velocity.min.js"></script>
+    <script>
+    $(document).ready(function () {
+        function sendGroupMessage(token) {
+            // Hide the controls.
+            $("#controls").animate(
+                { 
+                    opacity: 0
+                }, 
+                { 
+                    duration: 1000, 
+                    easing: "linear"
+                }
+            );
+            // Make the POST request to the PHP script and pass the values of the fields.
+            $.ajax({
+                type: 'post',
+                url: "sendGroupMessage.php",
+                data: {
+                    name: $("#name").val(),
+                    message: $("#message").val(),
+                    token: token
+                }
+            }).done(function(data) {
+                // If any error occurred, display it.
+                if(data)
+                    alert(data);
+                // When the data returns, clear the message box and show the controls.
+                $('#message').val("");
+                $("#controls").animate(
+                    { 
+                        opacity: 1 
+                    }, 
+                    { 
+                        duration: 1000, 
+                        easing: "linear"
+                    }
+                );
+            });
+        }
+        
+        // Polls the chatlog every second for changes.
+        (function retrieveMessages() {
+            $.get("chat.log?t=" + Math.random(), function(data) {
+                $("#chat").html(data);
+                $("#chat").scrollTop($("#chat")[0].scrollHeight);
+                setTimeout(retrieveMessages, 1000);
+            });
+        }());
+        
+        $.get('session.php').then((token) => {
+            // When the send button is pressed, then call the sendGroupMessage function to
+            // send the message to the PHP script, which then send the message to Corrade.
+            $("#send").click(function(e){
+                sendGroupMessage(token);
+            });
+        
+            // Subscribe to pressing enter with the message input box selected.
+            $("#message").keypress(function(e) {
+                if (e.which == 13) {
+                    sendGroupMessage(token);
+                    return false;
+                }
+            });
+        });
+    });
+    </script>
+</body>
+</html>

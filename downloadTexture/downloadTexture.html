@@ -1,0 +1,50 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Download Texture</title>
+
+    <meta name="description" content="Retrieving and Displaying an In-World Texture">
+    <meta name="author" content="Wizardry and Steamworks">
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $("#download").click(function(e) {
+                $("#control").animate({
+                    opacity: 'hide'
+                }, 'slow');
+                $('#texture').attr('src', 'images/loader.gif');
+                $.ajax({
+                    type: 'post',
+                    url: "downloadTexture.php?t=" + Math.random(),
+                    data: {
+                        uuid: $("#uuid").val()
+                    }
+                }).done(function(data) {
+                    $('#texture').attr('src', "data:image/png;base64," + data);
+                    $("#control").animate({
+                        opacity: 'show'
+                    }, 'slow');
+                });
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="container" align="center">
+        <div id="image">
+            <img src="images/loader-image.png" align="middle" id="texture"><br/>
+        </div>
+        <div id="control">
+            <input type="text" size="32" value="" id="uuid"></input><br/>
+            <button type="button" id="download">Download</button>
+        </div>
+    </div>
+</body>
+
+</html>

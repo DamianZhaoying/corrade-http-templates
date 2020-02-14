@@ -1,0 +1,30 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Track Group Membership</title>
+    <meta name="author" content="Wizardry and Steamworks">
+    
+    <link rel="stylesheet" href="css/style.css?v=1.1">
+    
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript">
+    $(document).ready(function () {
+        setInterval(function () {
+            $.get("membership.log?q=" + Math.random(), function(data) {
+                $("#membership").html(data);
+            });
+            $("#membership").scrollTop($("#membership")[0].scrollHeight);
+        }, 1000);
+    });
+    </script>
+</head>
+
+<body>
+    <div id="container">
+        <textarea id="membership" rows="12"></textarea><br/>
+    </div>
+</body>
+</html>

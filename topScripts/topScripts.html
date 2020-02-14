@@ -1,0 +1,68 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Summary of Top Scripts on a Region</title>
+    
+    <meta name="description" content="Top Scripts on a Region using Corrade">
+    <meta name="author" content="Wizardry and Steamworks">
+    
+    <link rel="stylesheet" href="css/jquery.dataTables.css?v=1.1">
+    
+    <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/jquery.dataTables.js"></script>
+    <script type="text/javascript">
+    $(document).ready(function () {
+            $.fn.dataTable.ext.errMode = 'throw';
+            function retrieveData() {
+                table.ajax.reload(null, false);
+            }
+            var table = $('#topScripts').DataTable(
+                {
+                    ajax: {
+                        url: 'topScripts.php?t=' + Math.random(),
+                        dataSrc: function(src) {
+                            setTimeout(retrieveData, 1000);
+                            return src.data;
+                        }
+                    },
+                    order: [
+                        [
+                            0, 
+                            'desc'
+                        ]
+                    ]
+                }
+            );
+            setTimeout(retrieveData, 1000);
+        }
+    );
+    </script>
+</head>
+
+<body>
+    <table id="topScripts" class="display" cellspacing="0" width="100%">
+        <thead>
+            <tr>
+                <th>Score</th>
+                <th>Task Name</th>
+                <th>UUID</th>
+                <th>Owner</th>
+                <th>Position</th>
+            </tr>
+        </thead>
+
+        <tfoot>
+            <tr>
+                <th>Score</th>
+                <th>Task Name</th>
+                <th>UUID</th>
+                <th>Owner</th>
+                <th>Position</th>
+            </tr>
+        </tfoot>
+    </table>
+</body>
+</html>

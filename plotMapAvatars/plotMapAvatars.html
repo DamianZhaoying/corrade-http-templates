@@ -1,0 +1,37 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Display Avatars moving in Real-Time on the Map</title>
+    
+    <meta name="description" content="Display Avatars moving in Real-Time on the Map">
+    <meta name="author" content="Wizardry and Steamworks">
+    
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript">
+    $(document).ready(function () {
+        function requestAvatarPositions() {
+            $.ajax({
+                type: 'post',
+                url: "plotMapAvatars.php?t=" + Math.random(),
+                data: {
+                    uuid: $("#uuid").val()
+                }
+            }).done(function(data) {
+                $('#texture').attr('src', "data:image/png;base64," + data);
+                setTimeout(requestAvatarPositions, 1000);
+            });
+        }
+        setTimeout(requestAvatarPositions, 1000);
+    });
+    </script>
+</head>
+
+<body>
+    <div id="container" align="center">
+        <img src="" align="middle" id="texture">
+    </div>
+</body>
+</html>

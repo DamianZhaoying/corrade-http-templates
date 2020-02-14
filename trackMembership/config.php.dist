@@ -1,0 +1,12 @@
+<?php
+
+# Set this to the name of the group.
+$GROUP = 'My Group';
+# Set this to the group password.
+$PASSWORD = 'mypassword';
+# Set this to Corrade's HTTP Server URL.
+$URL = 'http://corrade.internal.webserver:8080';
+# Set this to the location of the PHP script that stores group messages.
+$STORE = 'http://my.webserver.org/corrade/trackMembership/storeMembership.php';
+# How many lines to store?
+$MEMBERSHIP_LINES = 10;

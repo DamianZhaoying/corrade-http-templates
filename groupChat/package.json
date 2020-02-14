@@ -1,0 +1,24 @@
+{
+  "name": "corrade-http-group-chat",
+  "version": "1.0.0",
+  "description": "HTTP template demonstrating a group chat using Corrade",
+  "main": "groupChat.html",
+  "dependencies": {
+    "bootstrap": "^4.1.3",
+    "bootstrap-validator": "^0.11.9",
+    "jquery": "^3.3.1",
+    "velocity-animate": "^1.5.2"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "HTTP",
+    "group",
+    "chat",
+    "Corrade"
+  ],
+  "author": "Wizardry and Steamworks <office@grimore.org>",
+  "license": "GPL-3.0"
+}

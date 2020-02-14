@@ -1,0 +1,51 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <title>[Wizardry and Steamworks]:Corrade - Mass Invites</title>
+
+    <meta name="description" content="Mass Invites using Corrade">
+    <meta name="author" content="Wizardry and Steamworks">
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $("#send").click(function(e) {
+                $("#controls").animate({
+                    opacity: 'hide'
+                }, 'slow');
+                $.ajax({
+                    type: 'post',
+                    url: "sendMassInvites.php",
+                    data: {
+                        avatars: $("#avatars").val()
+                    }
+                }).done(function(data) {
+                    $('#avatars').val(data);
+                    $("#controls").animate({
+                        opacity: 'show'
+                    }, 'slow');
+                });
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <div id="container">
+        <textarea id="avatars" rows="12">Kira Komarov
+LindenHomeDemo Resident
+Garbage Garbage Garbage - woooooo!! Test test!
+d726edfb-a1c4-4499-8c01-2746227b55e5
+Philip Linden
+</textarea><br/>
+        <div id="controls">
+            <button type="button" id="send">Send</button>
+        </div>
+    </div>
+</body>
+
+</html>

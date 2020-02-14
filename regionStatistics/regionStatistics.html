@@ -1,0 +1,239 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Reading Simulator Statistics using Corrade</title>
+
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+    <script type="text/javascript">
+        $(function() {
+            function retrieveStats(series_1, series_2, series_3, series_4, series_5) {
+                $.ajax({
+                    type: 'post',
+                    url: "getRegionData.php",
+                    data: "query=Stats.ScriptTime,Stats.Dilation,Stats.FPS,Stats.PhysicsFPS,Stats.AgentUpdates&t=" + Math.random()
+                }).done(function(response) {
+                    var time = (new Date()).getTime();
+                    var data = $.parseJSON(response);
+                    series_1.addPoint(
+                        [
+                            time,
+                            parseFloat(
+                                data["Stats.ScriptTime"]
+                            )
+                        ],
+                        false, // false for all but last
+                        true
+                    );
+                    series_2.addPoint(
+                        [
+                            time,
+                            parseFloat(
+                                data["Stats.Dilation"]
+                            )
+                        ],
+                        false, // false for all but last
+                        true
+                    );
+                    series_3.addPoint(
+                        [
+                            time,
+                            parseFloat(
+                                data["Stats.FPS"]
+                            )
+                        ],
+                        false, // false for all but last
+                        true
+                    );
+                    series_4.addPoint(
+                        [
+                            time,
+                            parseFloat(
+                                data["Stats.PhysicsFPS"]
+                            )
+                        ],
+                        false, // false for all but last
+                        true
+                    );
+                    series_5.addPoint(
+                        [
+                            time,
+                            parseFloat(
+                                data["Stats.AgentUpdates"]
+                            )
+                        ],
+                        true,
+                        true
+                    );
+                    setTimeout(
+                        retrieveStats,
+                        1000,
+                        series_1,
+                        series_2,
+                        series_3,
+                        series_4,
+                        series_5
+                    );
+                });
+            }
+            Highcharts.setOptions({
+                global: {
+                    useUTC: true
+                }
+            });
+            $('#container').highcharts({
+                chart: {
+                    type: 'spline',
+                    animation: Highcharts.svg, // don't animate in old IE
+                    marginRight: 10,
+                    //shadow: true,
+                    events: {
+                        load: function() {
+                            // set up the updating of the chart each second
+                            setTimeout(
+                                retrieveStats,
+                                1000,
+                                this.series[0],
+                                this.series[1],
+                                this.series[2],
+                                this.series[3],
+                                this.series[4]
+                            );
+                        }
+                    }
+                },
+                title: {
+                    text: '',
+                    useHTML: false
+                },
+                title: {
+                    text: 'Region statistics for <a href="secondlife://Puguet%20Sound/128/128/10">Puguet Sound</a> using Corrade',
+                    useHTML: true
+                },
+                credits: {
+                    enabled: false
+                },
+                xAxis: {
+                    type: 'datetime',
+                    tickPixelInterval: 150
+                },
+                yAxis: [{
+                    type: 'logarithmic',
+                    title: {
+                        text: ''
+                    },
+                    plotLines: [{
+                        value: 0,
+                        width: 1,
+                        color: '#808080'
+                    }]
+                }],
+                tooltip: {
+                    formatter: function() {
+                        return '<b>' + this.series.name + '</b><br/>' +
+                            Highcharts.dateFormat('%Y-%m-%d %H:%M:%S', this.x) + '<br/>' +
+                            Highcharts.numberFormat(this.y, 2);
+                    }
+                },
+                legend: {
+                    enabled: true
+                },
+                exporting: {
+                    enabled: true
+                },
+                series: [{
+                    name: 'Script Time',
+                    data: (function() {
+                        // generate the series length
+                        var data = [],
+                            time = (new Date()).getTime(),
+                            i;
+
+                        for (i = -19; i <= 0; i += 1) {
+                            data.push({
+                                x: time + i * 1000,
+                                y: 0
+                            });
+                        }
+                        return data;
+                    }())
+                }, {
+                    name: 'Dilation',
+                    data: (function() {
+                        // generate the series length
+                        var data = [],
+                            time = (new Date()).getTime(),
+                            i;
+
+                        for (i = -19; i <= 0; i += 1) {
+                            data.push({
+                                x: time + i * 1000,
+                                y: 0
+                            });
+                        }
+                        return data;
+                    }())
+                }, {
+                    name: 'FPS',
+                    data: (function() {
+                        // generate the series length
+                        var data = [],
+                            time = (new Date()).getTime(),
+                            i;
+
+                        for (i = -19; i <= 0; i += 1) {
+                            data.push({
+                                x: time + i * 1000,
+                                y: 0
+                            });
+                        }
+                        return data;
+                    }())
+                }, {
+                    name: 'Physics FPS',
+                    data: (function() {
+                        // generate the series length
+                        var data = [],
+                            time = (new Date()).getTime(),
+                            i;
+
+                        for (i = -19; i <= 0; i += 1) {
+                            data.push({
+                                x: time + i * 1000,
+                                y: 0
+                            });
+                        }
+                        return data;
+                    }())
+                }, {
+                    name: 'Agent Updates',
+                    data: (function() {
+                        // generate the series length
+                        var data = [],
+                            time = (new Date()).getTime(),
+                            i;
+
+                        for (i = -19; i <= 0; i += 1) {
+                            data.push({
+                                x: time + i * 1000,
+                                y: 0
+                            });
+                        }
+                        return data;
+                    }())
+                }]
+            });
+        });
+    </script>
+</head>
+
+<body>
+    <script src="js/highcharts.js"></script>
+    <script src="js/exporting.js"></script>
+
+    <div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+
+</body>
+
+</html>

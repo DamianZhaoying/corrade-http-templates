@@ -1,0 +1,22 @@
+* {
+    font-size: 11pt;
+    font-family: Curves;
+}
+textarea {
+    width: 640px;
+/*    height: 120px; */
+    resize: none;
+    overflow: hidden;
+    border: 1px solid #cccccc;
+    -webkit-border-radius: 1px 1px 1px 1px;
+    border-radius: 1px 1px 1px 1px;
+    -moz-box-sizing: content-box;
+    -webkit-box-sizing: content-box;
+    box-sizing: content-box;
+    padding: 1em;
+    background-image: url(bg.gif);
+    background-position: bottom right;
+    background-repeat: no-repeat;
+    -webkit-box-shadow:inset 1px 1px 10px 2px #FFF2A1;
+    box-shadow:inset 1px 1px 10px 2px #FFF2A1;
+}

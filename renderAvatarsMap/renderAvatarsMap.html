@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Wizardry and Steamworks - Real Time Avatar Tracking using Corrade in SecondLife.</title>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <link rel="stylesheet" href="css/style.css?v=1.0">
+    </head>
+
+    <body>
+        <div id="container"></div>
+        <div id="info">
+            Wizardry and Steamworks - Real Time Avatar Tracking using Corrade in SecondLife.<br/>
+            All the graphical elements and data are generated dynamically!<br/>
+            MOVE mouse &amp; press LEFT/A: rotate, MIDDLE/S: zoom, RIGHT/D: pan<br/>
+            <a href="#" target="_blank">Click to Open in new Window</a><br/>
+        </div>
+        
+        <!-- Terrain Vertex and Fragment Shaders -->
+        <!-- Vertex Shader -->
+        <script id="terrainVertex" type="x-shader/x-vertex">
+            uniform sampler2D bumpTexture;
+            uniform float bumpScale;
+
+            varying vec2 vUV;
+
+            void main() {
+                vUV = uv;
+                vec4 bumpData = texture2D(bumpTexture, uv);
+                
+                // move the position along the normal
+                vec3 newPosition = 
+                    position + 
+                    normal * 
+                    bumpScale * 
+                    bumpData.r; // use red channel (all equal in greyscale)
+
+                gl_Position = 
+                    projectionMatrix * 
+                    modelViewMatrix * 
+                    vec4(newPosition, 1.0);
+            }
+        </script>
+        <!-- Fragment Shader / Pixel Shader -->
+        <script id="terrainFragment" type="x-shader/x-vertex"> 
+            uniform sampler2D mapTexture;
+            varying vec2 vUV;
+
+            void main() {
+                vec4 map = texture2D(mapTexture, vUV);
+                gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0)  + map; //, 1.0);
+            }  
+        </script>
+        <!-- -->
+
+        <script src="js/jquery.min.js"></script>
+        <script src="js/three.min.js"></script>
+        <script src="js/OrbitControls.min.js"></script>
+        <script src="js/CMUTypewriter_Regular.min.js"></script>
+
+        <script>
+            
+            /* The bounds of the plot. */
+            var plotBounds = {
+                  'maxx' : 256,
+                  'minx' : -256,
+                  'maxy' : 256,
+                  'miny' : -256,
+                  'maxz' : 256,
+                  'minz' : -256
+            };
+            
+            /* This represents the bounds of the data to plot.
+             * These values will be linearly mapped onto the 
+             * bounds for the plot.
+             */
+            var dataBounds = {
+                'maxx' : 256,
+                'minx' : 0,
+                'maxy' : 256,
+                'miny' : 0,
+                'maxz' : 256, // Second Life maximum rez altitude
+                'minz' : 0
+            }
+            
+            /* Structure to be filled by the backend scripts. */
+            var csv =
+                {
+                    'header' : [ "x", "y", "z" ],
+                    'positions' : [],
+                    'names' : [],
+                    'colors' : []
+                };
+            
+            /* The size of the cursor for each avatar. */
+            var dotSize = 8;
+            /* The interval in milliseconds for updating the terrain. */
+            var mapFetchInterval = 60000;
+            /* The interval in milliseconds for avatar position updates. */
+            var avatarsFetchInterval = 1000;
+            
+            var container;
+            var camera, controls, scene, renderer;
+            var scatterPlot;
+            var points;
+            var avatarLabels = [];
+            var avatarProjections = [];
+            var mapImageData = null;
+            var mapBumpData = null;
+            var mapHeight;
+            var mapMesh;
+            
+            init();
+            animate();
+
+            function init() {
+                /* Create the camera. */
+                camera = new THREE.PerspectiveCamera(
+                    60,
+                    window.innerWidth / window.innerHeight, 
+                    2,
+                    10000
+                );
+                camera.position.z = plotBounds.maxz * 2;
+                camera.position.x = 0;
+                camera.position.y = plotBounds.maxy * 1.25;
+                controls = new THREE.OrbitControls(camera);
+                controls.damping = 0.2;
+                controls.addEventListener('change', render);
+
+                /* Create the scene. */
+                scene = new THREE.Scene();
+                
+                /* Add the scatterplot to it. */
+                scatterPlot = new THREE.Object3D();
+                scene.add(scatterPlot);
+
+                /* Draw axes. */
+                var xAxisGeo = new THREE.Geometry();
+                var yAxisGeo = new THREE.Geometry();
+                var zAxisGeo = new THREE.Geometry();
+
+                xAxisGeo.vertices.push(
+                    new THREE.Vector3(
+                            plotBounds.minx/2, 
+                            plotBounds.miny/2, 
+                            plotBounds.minz/2
+                        ), 
+                    new THREE.Vector3(
+                        plotBounds.maxx/2, 
+                        plotBounds.miny/2, 
+                        plotBounds.minz/2
+                        )
+                );
+                yAxisGeo.vertices.push(
+                    new THREE.Vector3(
+                        plotBounds.minx/2, 
+                        plotBounds.miny/2, 
+                        plotBounds.minz/2
+                    ), 
+                    new THREE.Vector3(
+                        plotBounds.minx/2, 
+                        plotBounds.maxy/2, 
+                        plotBounds.minz/2
+                    )
+                );
+                zAxisGeo.vertices.push(
+                    new THREE.Vector3(
+                        plotBounds.minx/2, 
+                        plotBounds.miny/2, 
+                        plotBounds.minz/2
+                    ), 
+                    new THREE.Vector3(
+                        plotBounds.minx/2, 
+                        plotBounds.miny/2, 
+                        plotBounds.maxz/2
+                        )
+                );
+
+                var xAxisMat = new THREE.LineBasicMaterial(
+                    {
+                        color: 0xa60000, 
+                        lineWidth: 1
+                    }
+                );
+                var xAxis = new THREE.Line(xAxisGeo, xAxisMat);
+                xAxis.type = THREE.Lines;
+                scatterPlot.add(xAxis);
+
+                var yAxisMat = new THREE.LineBasicMaterial(
+                    {
+                        color: 0x0000a6, 
+                        lineWidth: 1
+                    }
+                );
+                var yAxis = new THREE.Line(yAxisGeo, yAxisMat);
+                      yAxis.type = THREE.Lines;
+                      scatterPlot.add(yAxis);
+
+                var zAxisMat = new THREE.LineBasicMaterial(
+                    {
+                        color: 0x00a600, 
+                        lineWidth: 1
+                    }
+                );
+                var zAxis = new THREE.Line(zAxisGeo, zAxisMat);
+                zAxis.type = THREE.Lines;
+                scatterPlot.add(zAxis);
+
+                /* Add axes text. */
+                var text3d = new THREE.TextGeometry("O", {
+                    size: 8,
+                    height: 2,
+                    curveSegments: 2,
+                    font: "cmutypewriter_regular"
+
+                });
+                text3d.computeBoundingBox();
+                var centerOffset = -0.5 * (
+                    text3d.boundingBox.max.x - 
+                    text3d.boundingBox.min.x
+                );
+                var textMaterial = new THREE.MeshBasicMaterial(
+                    { 
+                        color: 0xa6a6a6, 
+                        overdraw: 0.5 
+                    } 
+                );
+                text = new THREE.Mesh(text3d, textMaterial);
+                text.position.x = plotBounds.minx/2 + 2 * centerOffset;
+                text.position.y = plotBounds.minx/2 + 2 * centerOffset;
+                text.position.z = plotBounds.minx/2;
+                scatterPlot.add(text);
+            
+                text3d = new THREE.TextGeometry(
+                    csv.header[0] + 
+                    " " + 
+                    "(" + 
+                    dataBounds.maxx + 
+                    "m)", 
+                    {
+                        size: 8,
+                        height: 2,
+                        curveSegments: 2,
+                        font: "cmutypewriter_regular"
+                    }
+                );
+                text3d.computeBoundingBox();
+                centerOffset = -0.5 * (
+                    text3d.boundingBox.max.x - 
+                    text3d.boundingBox.min.x 
+                );
+                textMaterial = new THREE.MeshBasicMaterial(
+                    { 
+                        color: 0xa60000, 
+                        overdraw: 0.5
+                    }
+                );
+                text = new THREE.Mesh(text3d, textMaterial);
+                text.position.x = plotBounds.maxx/2 - centerOffset / 4;
+                text.position.y = plotBounds.miny/2 + centerOffset / 8;
+                text.position.z = plotBounds.minz/2;
+                scatterPlot.add(text);
+
+                text3d = new THREE.TextGeometry(
+                    csv.header[2] + 
+                    " " + 
+                    "(" + 
+                    dataBounds.maxz + 
+                    "m)", 
+                    {
+                        size: 8,
+                        height: 2,
+                        curveSegments: 2,
+                        font: "cmutypewriter_regular"
+                    }
+                );
+                text3d.computeBoundingBox();
+                centerOffset = -0.5 * (
+                    text3d.boundingBox.max.x - 
+                    text3d.boundingBox.min.x
+                );
+                textMaterial = new THREE.MeshBasicMaterial(
+                    {
+                        color: 0x0000a6, 
+                        overdraw: 0.5 
+                    }
+                );
+                text = new THREE.Mesh( text3d, textMaterial );
+                text.position.x = plotBounds.minx/2 + centerOffset;
+                text.position.y = plotBounds.maxy/2 - centerOffset / 4;
+                text.position.z = plotBounds.minz/2;
+                scatterPlot.add(text);
+
+                text3d = new THREE.TextGeometry(
+                    csv.header[1] + 
+                    " " + 
+                    "(" + 
+                    dataBounds.maxy + 
+                    "m)", 
+                    {
+                        size: 8,
+                        height: 2,
+                        curveSegments: 2,
+                        font: "cmutypewriter_regular"
+                    }
+                );
+                text3d.computeBoundingBox();
+                centerOffset = -0.5 * (
+                    text3d.boundingBox.max.x -
+                    text3d.boundingBox.min.x
+                );
+                textMaterial = new THREE.MeshBasicMaterial(
+                    {
+                        color: 0x00a600,
+                        overdraw: 0.5 
+                    }
+                );
+                text = new THREE.Mesh(text3d, textMaterial);
+                text.position.x = plotBounds.minx/2 + centerOffset;
+                text.position.y = plotBounds.miny/2;
+                text.position.z = plotBounds.maxz/2 - centerOffset / 4;
+                scatterPlot.add(text);
+                
+                /* Add enclosing case. */
+                var enclosingCubeGeometry = enclosingCase(plotBounds.maxx);
+                enclosingCubeGeometry.computeLineDistances();
+                var enclosingCube = 
+                    new THREE.Line(
+                        enclosingCubeGeometry, 
+                        new THREE.LineDashedMaterial(
+                            {
+                                color: 0xa6a6a6,
+                                dashSize: 3,
+                                gapSize: 1,
+                                linewidth: 2
+                            }
+                        ), 
+                        THREE.LinePieces
+                    );
+                scene.add(enclosingCube);
+
+                // renderer
+                renderer = new THREE.WebGLRenderer(
+                    { 
+                        antialias: true
+                    }
+                );
+                renderer.setClearColor(0x1d475f, 1.0);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+
+                container = document.getElementById( 'container' );
+                container.appendChild( renderer.domElement );
+                
+                window.addEventListener('resize', onWindowResize, false );
+
+                render();
+                
+                getAvatars();
+                getMapTexture();
+                getMapHeight();
+                getMapTerrain();
+            }
+
+            function onWindowResize() {
+
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize( window.innerWidth, window.innerHeight );
+                //controls.handleResize();
+                render();
+            }
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+            }
+
+            function render() {
+                renderer.render(scene,camera);
+            }
+            
+            function enclosingCase(size) {
+                var h = size * 0.5;
+                var geometry = new THREE.Geometry();
+                geometry.vertices.push(
+                    // Oz
+                    //new THREE.Vector3( -h, -h, -h ),
+                    //new THREE.Vector3( -h, h, -h ),
+
+                    new THREE.Vector3( -h, h, -h ),
+                    new THREE.Vector3( h, h, -h ),
+
+                    new THREE.Vector3( h, h, -h ),
+                    new THREE.Vector3( h, -h, -h ),
+                    
+                    // Ox
+                    //new THREE.Vector3( h, -h, -h ),
+                    //new THREE.Vector3( -h, -h, -h ),
+
+                    new THREE.Vector3( -h, -h, h ),
+                    new THREE.Vector3( -h, h, h ),
+
+                    new THREE.Vector3( -h, h, h ),
+                    new THREE.Vector3( h, h, h ),
+
+                    new THREE.Vector3( h, h, h ),
+                    new THREE.Vector3( h, -h, h ),
+
+                    new THREE.Vector3( h, -h, h ),
+                    new THREE.Vector3( -h, -h, h ),
+
+                    // Oy
+                    //new THREE.Vector3( -h, -h, -h ),
+                    //new THREE.Vector3( -h, -h, h ),
+
+                    new THREE.Vector3( -h, h, -h ),
+                    new THREE.Vector3( -h, h, h ),
+
+                    new THREE.Vector3( h, h, -h ),
+                    new THREE.Vector3( h, h, h ),
+
+                    new THREE.Vector3( h, -h, -h ),
+                    new THREE.Vector3( h, -h, h )
+                 );
+                return geometry;
+            }
+            
+            function makeTextSprite(message, parameters) {
+                if ( parameters === undefined ) parameters = {};
+
+                var fontface = parameters.hasOwnProperty("fontface") ? 
+                    parameters["fontface"] : 
+                    "Computer Modern Typewriter";
+
+                var fontsize = parameters.hasOwnProperty("fontsize") ? 
+                    parameters["fontsize"] : 
+                    18;
+
+                var borderThickness = 
+                    parameters.hasOwnProperty("borderThickness") ? 
+                    parameters["borderThickness"] : 
+                    4;
+
+                var borderColor = 
+                    parameters.hasOwnProperty("borderColor") ? 
+                    parameters["borderColor"] : 
+                    { r:0, g:0, b:0, a:1.0 };
+
+                var backgroundColor = 
+                    parameters.hasOwnProperty("backgroundColor") ?
+                    parameters["backgroundColor"] : 
+                    { r:255, g:255, b:255, a:1.0 };
+                    
+                var canvas = document.createElement('canvas');
+                canvas.width = 162;
+                canvas.height = 64;
+                var context = canvas.getContext('2d');
+                context.font = "Bold " + fontsize + "px " + fontface;
+                context.imageSmoothingEnabled = true;
+
+                // determine the longest line
+                var textLines = message.split("\n");
+                var longestLine = textLines[0].length;
+                var longestIndex = 0;
+                for(var i = 1; i <textLines.length; ++i) {
+                    if(textLines[i].length > longestLine) {
+                        longestLine = textLines[i].length;
+                        longestIndex = i;
+                    }
+                }
+
+                // get size data (height depends only on font size)
+                var metrics = context.measureText(textLines[longestIndex]);
+                var textWidth = metrics.width;
+
+                // background color
+                context.fillStyle = 
+                    "rgba(" + 
+                        backgroundColor.r + 
+                        "," + 
+                        backgroundColor.g + 
+                        "," + 
+                        backgroundColor.b + 
+                        "," + 
+                        backgroundColor.a + 
+                    ")";
+                // border color
+                context.strokeStyle = 
+                    "rgba(" + 
+                        borderColor.r + 
+                        "," + 
+                        borderColor.g + 
+                        "," + 
+                        borderColor.b + 
+                        "," + 
+                        borderColor.a + 
+                    ")"; 
+
+                context.lineWidth = borderThickness;
+                roundRect(
+                    context, 
+                    borderThickness/2, 
+                    borderThickness/2, 
+                    textWidth + borderThickness,
+                    // 1.2 is extra height factor for text below baseline
+                    textLines.length * fontsize * 1.2 + borderThickness,
+                    6
+                );
+
+                // add the text color
+                context.fillStyle = 
+                    "rgba(" + 
+                        borderColor.r + 
+                        "," + 
+                        borderColor.g + 
+                        "," + 
+                        borderColor.b + 
+                        "," + 
+                        borderColor.a + 
+                    ")";
+                
+                // add all the requested lines whist increasing lines
+                for(var i = 0; i< textLines.length; ++ i) {
+                    context.fillText(
+                        textLines[i], 
+                        borderThickness,
+                        fontsize
+                    );
+                    fontsize += fontsize;
+                }
+
+                // canvas contents will be used for a texture
+                var spriteTexture = new THREE.Texture(canvas,
+                    THREE.UVMapping, // mapping
+                    THREE.ClampToEdgeWrapping, // wrapS
+                    THREE.ClampToEdgeWrapping, // wrapT
+                    THREE.NearestFilter, // magfilter
+                    THREE.NearestFilter, //minfilter,
+                    THREE.RGBAFormat, // format
+                    THREE.UnsignedByteType // type
+                ) 
+                spriteTexture.anisotropy = renderer.getMaxAnisotropy();
+                spriteTexture.needsUpdate = true;
+                var spriteMaterial = new THREE.SpriteMaterial( 
+                    {
+                        map: spriteTexture, 
+                        useScreenCoordinates: false,
+                        overdraw: false, 
+                        side:THREE.DoubleSide
+                    }
+                );
+                var sprite = new THREE.Sprite(spriteMaterial);
+                sprite.scale.set(64,32, 1.0);
+                return sprite;  
+            }
+
+            // function for drawing rounded rectangles
+            function roundRect(ctx, x, y, w, h, r) 
+            {
+                ctx.beginPath();
+                ctx.moveTo(x+r, y);
+                ctx.lineTo(x+w-r, y);
+                ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+                ctx.lineTo(x+w, y+h-r);
+                ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+                ctx.lineTo(x+r, y+h);
+                ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+                ctx.lineTo(x, y+r);
+                ctx.quadraticCurveTo(x, y, x+r, y);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();   
+            }
+
+            /*************************************************************************/
+            /*    Copyright (C) 2015 Wizardry and Steamworks - License: GNU GPLv3    */
+            /*************************************************************************/
+            function wasMapValueToRange(value, xMin, xMax, yMin, yMax) {
+                return yMin + (
+                    ( yMax - yMin ) * ( value - xMin ) / ( xMax - xMin )
+                );
+            }
+            
+            function updatePoints() {
+                /* Remove points. */
+                scatterPlot.remove(points);
+                /* Remove labels. */
+                for(i=0; i<avatarLabels.length; ++i) {
+                    scatterPlot.remove(avatarLabels[i]);
+                }
+                /* Remove projections. */
+                for(i=0; i<avatarProjections.length; ++i) {
+                    scatterPlot.remove(avatarProjections[i])
+                }
+                
+                var pointGeo = new THREE.Geometry();
+                avatarLabels = [];
+                avatarProjections = [];
+
+                for (i=0; i<csv.positions.length; i++)
+                {
+                    for (j=2; j<csv.header.length; j++)
+                    {
+                        /* For SecondLife the z and y axes must be swapped
+                         * and then the x and y axes in order to attain
+                         * the proper orientation for threejs.
+                         */
+                        var x = wasMapValueToRange(
+                            csv.positions[i][1],
+                            dataBounds.minx,
+                            dataBounds.maxx,
+                            plotBounds.minx/2,
+                            plotBounds.maxx/2
+                        );
+                        var y = wasMapValueToRange(
+                            csv.positions[i][j],
+                            dataBounds.minz,
+                            dataBounds.maxz,
+                            plotBounds.minz/2,
+                            plotBounds.maxz/2
+                        );
+                        var z = wasMapValueToRange(
+                            csv.positions[i][0],
+                            dataBounds.miny,
+                            dataBounds.maxy,
+                            plotBounds.miny/2,
+                            plotBounds.maxy/2
+                        );
+                        
+                        // Add the points
+                        pointGeo.vertices.push(
+                            new THREE.Vector3(
+                                x, 
+                                y + dotSize/4, 
+                                z
+                            ) 
+                        );
+                        
+                        // Add the color for the point.
+                        var pointColor = new THREE.Color().setRGB(
+                            csv.colors[i][0], 
+                            csv.colors[i][1], 
+                            csv.colors[i][2]
+                        );
+                        pointGeo.colors.push(pointColor);
+                        
+                        // Add the projection in plane xOy
+                        var lineMaterial = new THREE.LineDashedMaterial(
+                            {
+                               color: pointColor.getHex(),
+                               linewidth: 1,
+                               gapSize: 1
+                            }
+                        );
+                        var lineGeometry = new THREE.Geometry();
+                        lineGeometry.vertices.push(
+                            new THREE.Vector3(
+                                x, 
+                                y, 
+                                z
+                            )
+                        );
+                        lineGeometry.vertices.push(
+                            new THREE.Vector3(
+                                x, 
+                                plotBounds.minz/2, 
+                                z
+                            )
+                        );
+                        lineGeometry.computeLineDistances();
+                        var xOyProjection = new THREE.Line(
+                            lineGeometry, 
+                            lineMaterial,
+                            THREE.LineStrip
+                        );
+                        avatarProjections.push(xOyProjection)
+                        scatterPlot.add(xOyProjection);
+                        
+                        // Generate the label.
+                        var sprite = makeTextSprite(
+                            " " + 
+                            csv.names[i] + 
+                            " " + 
+                            "\n" +
+                            " " + 
+                            "@" + 
+                            "<" + 
+                            csv.positions[i][0] + 
+                            "," + 
+                            csv.positions[i][1] + 
+                            "," + 
+                            csv.positions[i][j] + 
+                            ">" +
+                            " ", 
+                            { 
+                                "fontsize": 9, 
+                                "backgroundColor": 
+                                    {r:255, g:255, b:255, a:1}, 
+                                "borderColor": 
+                                    {
+                                        r:Math.round(wasMapValueToRange(
+                                            csv.colors[i][0], 
+                                            0, 
+                                            1, 
+                                            0, 
+                                            255
+                                        )), 
+                                        g:Math.round(wasMapValueToRange(
+                                            csv.colors[i][1], 
+                                            0, 
+                                            1, 
+                                            0, 
+                                            255
+                                        )), 
+                                        b:Math.round(wasMapValueToRange(
+                                            csv.colors[i][2], 
+                                            0, 
+                                            1, 
+                                            0, 
+                                            255
+                                        )),
+                                        a:1
+                                    },
+                                "borderThickness": 1 
+                            } 
+                        );
+                        
+                        sprite.position.x = pointGeo.vertices[i].x;
+                        sprite.position.y = pointGeo.vertices[i].y;
+                        sprite.position.z = pointGeo.vertices[i].z;
+                        
+                        avatarLabels.push(sprite);
+                        scatterPlot.add(sprite);
+                        
+                    }
+                }
+                var pointCloudTexture = THREE.ImageUtils.loadTexture( 
+                    "images/triangle.gif"
+                );
+                pointCloudTexture.anisotropy = renderer.getMaxAnisotropy();
+                var pointCloudMaterial = new THREE.PointCloudMaterial(
+                {
+                      size: dotSize,
+                      map: pointCloudTexture,
+                      blending: THREE.NormalBlending, // required
+                      depthTest: true, // required
+                      transparent: true,
+                      opacity: 1,
+                      vertexColors: true // optional
+                });
+                //pointCloudTexture.needsUpdate = true;
+                points = new THREE.PointCloud(
+                    pointGeo, 
+                    pointCloudMaterial
+                );
+                scatterPlot.add(points);
+                scatterPlot.needsUpdate = true;
+            }
+            
+            function updateMap() {
+                if(mapBumpData == null || mapImageData == null) return;
+                
+                scatterPlot.remove(mapMesh);
+                // texture used to generate "bumpiness"
+                var bumpTexture = new THREE.ImageUtils.loadTexture(
+                    'data:image/png;base64,' + mapBumpData
+                );
+                bumpTexture.wrapS = 
+                    bumpTexture.wrapT = 
+                    THREE.RepeatWrapping;
+                bumpTexture.anisotropy = renderer.getMaxAnisotropy();
+                // magnitude of normal displacement
+                var bumpScale = mapHeight;
+
+                var mapTexture = new THREE.ImageUtils.loadTexture(
+                    'data:image/png;base64,' + mapImageData
+                );
+                mapTexture.anisotropy = renderer.getMaxAnisotropy();
+                mapTexture.wrapS = mapTexture.wrapT;
+
+                // Create the uniforms.
+                this.customUniforms = {
+                    bumpTexture: { 
+                        type: "t", 
+                        value: bumpTexture 
+                    },
+                    bumpScale: { 
+                        type: "f", 
+                        value: bumpScale
+                    },
+                    mapTexture: { 
+                        type: "t", 
+                        value: mapTexture 
+                    },
+                };
+
+                // create custom material from the shader code above
+                // that is within specially labelled script tags
+                var customMaterial = 
+                    new THREE.ShaderMaterial( 
+                    {
+                        uniforms: customUniforms,
+                        vertexShader: document.getElementById(
+                            'terrainVertex'
+                        ).textContent,
+                        fragmentShader: document.getElementById(
+                            'terrainFragment'
+                        ).textContent,
+                        side: THREE.DoubleSide
+                    }
+                );
+
+                var planeGeo = new THREE.PlaneBufferGeometry(
+                    plotBounds.maxx, 
+                    plotBounds.maxy, 
+                    100,
+                    100
+                );
+
+                mapMesh = new THREE.Mesh(
+                    planeGeo,
+                    customMaterial
+                );
+                mapMesh.rotation.x = - Math.PI / 2;
+                mapMesh.rotation.z = - Math.PI / 2;
+                mapMesh.position.y = -plotBounds.maxy/2;
+                scatterPlot.add(mapMesh);
+                scatterPlot.needsUpdate = true;
+            }
+            
+            function getAvatars() {
+                $.ajax({
+                    type: 'POST',
+                    url: "getAvatars.php",
+                    cache: false,
+                    timeout: 60000
+                }).done(function(data) {
+                    switch(data != null && data != "") {
+                        case false:
+                            setTimeout(getAvatars, 1000);
+                            return;
+                    }
+                    var json = jQuery.parseJSON(data);
+                    switch(JSON.stringify(json) != JSON.stringify(csv)) {
+                        case true:
+                            csv = json;
+                            updatePoints();
+                            render();
+                            break;
+                    }
+                    setTimeout(getAvatars, avatarsFetchInterval);
+                }).error(function() {
+                    setTimeout(getAvatars, 1000);
+                });
+            }
+            
+            function getMapTerrain() {
+                $.ajax({
+                    type: 'POST',
+                    url: "generateTerrainHeightMap.php",
+                    cache: false,
+                    timeout: 60000
+                }).done(function(data) {
+                    // Only update if the data changed.
+                    switch(data != null && data != '') {
+                        case false:
+                            setTimeout(getMapTerrain, 1000);
+                            return;
+                    }
+                    switch(data != mapHeight) {
+                        case true:
+                            mapBumpData = data;
+                            updateMap();
+                            render();
+                            break;
+                    }
+                    setTimeout(getMapTerrain, mapFetchInterval);
+                }).error(function() {
+                    setTimeout(getMapTerrain, 1000);
+                });
+            }
+            
+            function getMapTexture() {
+                $.ajax({
+                    type: 'POST',
+                    url: "getMapTexture.php",
+                    cache: false,
+                    timeout: 60000
+                }).done(function(data) {
+                    // Only update if the data changed.
+                    switch(data != null && data != '') {
+                        case false:
+                            setTimeout(getMapTexture, 1000);
+                            return;
+                    }
+                    switch(data != mapHeight) {
+                        case true:
+                            mapImageData = data;
+                            updateMap();
+                            render();
+                            break;
+                    }
+                    setTimeout(getMapTexture, mapFetchInterval);
+                }).error(function() {
+                    setTimeout(getMapTexture, 1000);
+                });
+            }
+            
+            function getMapHeight() {
+                $.ajax({
+                    type: 'POST',
+                    url: "getMapHeight.php",
+                    cache: false,
+                    timeout: 60000
+                }).done(function(data) {
+                    // Only update if the data changed.
+                    switch(data != null && data != '') {
+                        case false:
+                            setTimeout(getMapHeight, 1000);
+                            return;
+                    }
+                    switch(data != mapHeight) {
+                        case true:
+                            mapHeight = data;
+                            updateMap();
+                            render();
+                            break;
+                    }
+                    setTimeout(getMapHeight, mapFetchInterval);
+                }).error(function() {
+                    setTimeout(getMapHeight, 1000);
+                });
+            }
+
+        </script>
+
+    </body>
+</html>

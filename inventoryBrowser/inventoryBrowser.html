@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Corrade Inventory Browser</title>
+    <link rel="stylesheet" href="node_modules/jstree/dist/themes/default/style.min.css" />
+    <link rel="stylesheet" href="node_modules/jquery-ui-dist/jquery-ui.min.css" />
+    <script src="node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="node_modules/jquery-ui-dist/jquery-ui.min.js"></script>
+    <script src="node_modules/jstree/dist/jstree.min.js"></script>
+    <script src="js/json-to-table.js"></script>
+    <script src="node_modules/jquery-base64/jquery.base64.min.js"></script>
+</head>
+
+<body>
+
+    <!-- Will hold the inventory tree (completed dynamically). -->
+    <div id="tree">
+    </div>
+
+    <!-- Used for various pup-up controls and information (completed dynamically). -->
+    <div id="popup">
+        <div id="content">
+        </div>
+    </div>
+
+    <!-- Main script -->
+    <script type="text/javascript">
+        $(function() {
+            function customMenu(node) {
+                // The default set of menu items for all types
+                var items = {
+                    // Grab information about the item.
+                    infoItem: {
+                        label: "Get Info",
+                        action: function(obj) {
+                            $('#popup').dialog({
+                                width: 800,
+                                height: 600,
+                                modal: true,
+                                resizable: false,
+                                dialogClass: 'no-close texture-dialog'
+                            }).on('dialogclose', function(event) {
+                                $('#content').html('');
+                            });
+                            $.ajax({
+                                type: 'POST',
+                                url: "getInventoryData.php?t=" + Math.random(),
+                                dataType: 'json',
+                                data: {
+                                    uuid: node.id.split(/[\/]+/).pop(),
+                                    data: [
+                                        'AssetUUID',
+                                        'CreationDate',
+                                        'Description',
+                                        'Permissions',
+                                        'UUID' // part of InventoryBase
+                                    ]
+                                }
+                            }).done(function(data) {
+                                $('#content').html(ConvertJsonToTable(data, null, null, null));
+                            });
+                        }
+                    }
+                };
+
+                // Give inventory items menu for anything but folders.
+                // They could be supported too but would require first
+                // counting the number of items inside the folder and
+                // only accepting to send if the number is below max.
+                if (node.data.type.localeCompare("folder") == 0) {
+                    $.extend(items, {
+                        giveItem: {
+                            label: "Give",
+                            action: function(obj) {
+                                $("#content").html('<form><fieldset class="ui-helper-reset"><label for="firstname">Firstname</label><input type="text" name="firstname" id="firstname" value="" class="ui-widget-content ui-corner-all"><br/><label for="lastname">Lastname</label><input type="text" name="lastname" id="lastname" value="" class="ui-widget-content ui-corner-all"></fieldset></form>');
+                                $("#popup").dialog({
+                                    width: 320,
+                                    height: 180,
+                                    modal: true,
+                                    resizable: false,
+                                    buttons: {
+                                        Select: function() {
+                                            if ($.trim($("#firstname").val()) == '' ||
+                                                $.trim($("#lastname").val()) == '')
+                                                return;
+                                            var firstName = $("#firstname").val();
+                                            var lastName = $("#lastname").val();
+                                            $.ajax({
+                                                type: 'POST',
+                                                url: "giveInventoryItem.php?t=" + Math.random(),
+                                                data: {
+                                                    uuid: node.id.split(/[\/]+/).pop(),
+                                                    firstname: firstName,
+                                                    lastname: lastName
+                                                }
+                                            }).done(function(data) {
+                                                $("#popup").dialog("close");
+                                                if ($.trim(data) != '')
+                                                    alert(data);
+                                            });
+                                        },
+                                        Cancel: function() {
+                                            $("#popup").dialog("close");
+                                        }
+                                    }
+                                }).on('dialogclose', function(event) {
+                                    $('#content').html('');
+                                    $('#popup').dialog('option', 'buttons', {});
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // The "download" menu item for textures.
+                if (node.data.type.localeCompare("texture") == 0 ||
+                    node.data.type.localeCompare("snapshot") == 0) {
+                    $.extend(items, {
+                        downloadItem: {
+                            label: "Download",
+                            "action": function(obj) {
+                                $('#texture').attr('src', 'images/loader.gif');
+                                $('#popup').dialog({
+                                    width: 800,
+                                    height: 600,
+                                    modal: true,
+                                    resizable: false,
+                                    dialogClass: 'no-close texture-dialog'
+                                }).on('dialogclose', function(event) {
+                                    $('#content').html('');
+                                });
+                                $.ajax({
+                                    type: 'POST',
+                                    url: "downloadTexture.php?t=" + Math.random(),
+                                    data: {
+                                        uuid: node.id.split(/[\/]+/).pop()
+                                    }
+                                }).done(function(data) {
+                                    $('#content').html('<img src="" align="middle" id="texture">');
+                                    $('#texture').attr('src', "data:image/png;base64," + data);
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // The "download" menu item for notecards.
+                if (node.data.type.localeCompare("notecard") == 0) {
+                    $.extend(items, {
+                        downloadItem: {
+                            label: "Download",
+                            "action": function(obj) {
+                                $('#texture').attr('src', 'images/loader.gif');
+                                $('#popup').dialog({
+                                    width: 800,
+                                    height: 600,
+                                    modal: true,
+                                    resizable: false,
+                                    dialogClass: 'no-close texture-dialog'
+                                }).on('dialogclose', function(event) {
+                                    $('#content').html('');
+                                });
+                                $.ajax({
+                                    type: 'POST',
+                                    url: "downloadNotecard.php?t=" + Math.random(),
+                                    data: {
+                                        uuid: node.id.split(/[\/]+/).pop()
+                                    }
+                                }).done(function(data) {
+                                    $.base64.utf8decode = true;
+                                    $('#content').html('<pre>' + $.base64.atob(data) + '</pre>');
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // The "download" menu item for sounds.
+                if (node.data.type.localeCompare("sound") == 0) {
+                    $.extend(items, {
+                        downloadItem: {
+                            label: "Download",
+                            "action": function(obj) {
+                                $('#texture').attr('src', 'images/loader.gif');
+                                $('#popup').dialog({
+                                    width: 800,
+                                    height: 600,
+                                    modal: true,
+                                    resizable: false,
+                                    dialogClass: 'no-close texture-dialog'
+                                }).on('dialogclose', function(event) {
+                                    $('#content').html('');
+                                });
+                                $.ajax({
+                                    type: 'POST',
+                                    url: "downloadSound.php?t=" + Math.random(),
+                                    data: {
+                                        uuid: node.id.split(/[\/]+/).pop()
+                                    }
+                                }).done(function(data) {
+                                    $('#content').html('<audio controls="controls"><source id="source" src="" type="audio/mp3"></source></audio>');
+                                    $('#source').attr('src', "data:audio/mp3;base64," + data);
+                                });
+                            }
+                        }
+                    });
+                }
+
+                return items;
+            }
+
+            $("#tree").jstree({
+                // - sort will sort items by date
+                // - state will store the open / closed state of the jstree
+                'plugins': ["themes", "json_data", "ui", "contextmenu", "sort", "dnd", "state"],
+                'contextmenu': {
+                    "items": function(node) {
+                        return customMenu(node);
+                    }
+                },
+                'dnd': {
+                    // Do not copy items.
+                    'copy': false,
+                    // Do not execute the check callback whilst dragging.
+                    'check_while_dragging': false
+                },
+                'sort': function(a, b) {
+                    return Date.parse(this.get_node(a).data.time) < Date.parse(this.get_node(b).data.time) ? 1 : -1;
+                },
+                'core': {
+                    'check_callback': function(operation, node, parent, position, more) {
+                        // Do not allow moves above the root node.
+                        if (parent.id == "#")
+                            return false;
+
+                        var moved = false;
+                        $.ajax({
+                            // A synchronous reply is needed so we know what to tell the tree.
+                            async: false,
+                            type: 'POST',
+                            url: "moveInventoryItem.php?t=" + Math.random(),
+                            data: {
+                                source: node.id,
+                                target: parent.id
+                            }
+                        }).done(function(data) {
+                            if ($.trim(data) != 'success') {
+                                if ($.trim(data) != '')
+                                    alert(data);
+                                return;
+                            }
+                            moved = true;
+                        });
+                        return moved;
+                    },
+                    'data': {
+                        "url": "getInventoryNode.php",
+                        "type": "POST",
+                        "dataType": "JSON",
+                        "data": function(node) {
+                            return node.id == "#" ? "folder=init" : "folder=" + node.id;
+                        }
+                    }
+                }
+            }).bind('move_node.jstree', function(e, data) {
+                // Once the node is moved, update the node ID to reflect the path change.
+                var parentPath = data.parent != '/' ? data.parent : "";
+                var item = data.node.id.split(/[\/]+/).pop();
+                data.instance.set_id(data.node, parentPath + '/' + item);
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,26 @@
+{
+  "name": "corrade-inventory-browser",
+  "version": "1.0.0",
+  "description": "Tree based HTTP inventory browser for Corrade",
+  "main": "inventoryBrowser.html",
+  "dependencies": {
+    "jquery": "^3.3.1",
+    "jquery-base64": "^1.0.0",
+    "jquery-ui": "^1.12.1",
+    "jquery-ui-dist": "^1.12.1",
+    "jstree": "^3.3.5"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "http",
+    "inventory",
+    "browser",
+    "tree",
+    "corrade"
+  ],
+  "author": "Wizardry and Steamworks <office@grimore.org>",
+  "license": "GPL-3.0"
+}

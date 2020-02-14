@@ -1,0 +1,9 @@
+<php
+
+# Set this to the name of the group.
+$GROUP = 'My Group';
+# Set this to the group password.
+$PASSWORD = 'mypassword';
+# Set this to Corrade's HTTP Server URL.
+$URL = 'http://corrade.hostname:8080';
+

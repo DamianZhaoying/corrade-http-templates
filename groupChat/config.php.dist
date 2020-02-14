@@ -1,0 +1,14 @@
+<?php
+
+# Set this to the name of the group.
+$GROUP = 'My Group';
+# Set this to the group password.
+$PASSWORD = 'mygrouppassword';
+# Set this to Corrade's HTTP Server URL.
+$URL = 'http://corrade.home:8181';
+# Set this to the location of the PHP script that stores group messages.
+$STORE = 'http://mywebsite.home/corrade-http-templates/groupChat/storeGroupMessage.php';
+# How many chat lines to store?
+$CHAT_LINES = 10;
+# The tag used for tracking this notification.
+$NOTIFICATION_TAG = 'b3687f59-115b-47cb-9f0c-75e6e6d7b506';

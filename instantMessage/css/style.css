@@ -1,0 +1,7 @@
+* {
+    font-size: 11pt;
+}
+textarea {
+    background-image: url(../img/background.png) !important;
+    background-repeat: repeat;
+}
